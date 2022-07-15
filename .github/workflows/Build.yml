@@ -1,0 +1,106 @@
+#
+# Copyright (C) 2022 Ing <https://github.com/wjz304>
+# 
+# This is free software, licensed under the MIT License.
+# See /LICENSE for more information.
+#
+
+
+name: Build OpenCore-Mod
+
+on:
+  push:
+  schedule:
+    - cron: '20 */6 * * *'
+  workflow_dispatch:
+
+env:
+  PROJECT_TYPE: UEFI
+  FORCE_INSTALL: 1
+  HAS_OPENSSL_BUILD: 1
+  HAS_OPENSSL_W32BUILD: 0
+  WERROR: 1
+
+jobs:
+  build-macos:
+    name: macOS XCODE5
+    runs-on: macos-latest
+    env:
+      JOB_TYPE: BUILD
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Add Linux Toolchain
+        run: brew tap FiloSottile/homebrew-musl-cross
+
+      - name: Install Linux Toolchain
+        run: brew install musl-cross
+        env:
+          HOMEBREW_NO_INSTALL_CLEANUP: 1
+          HOMEBREW_NO_AUTO_UPDATE: 1
+
+      - name: Install Dependencies
+        run: brew install openssl mingw-w64 nasm jq
+        env:
+          HOMEBREW_NO_INSTALL_CLEANUP: 1
+          HOMEBREW_NO_AUTO_UPDATE: 1
+
+      - name: CI Bootstrap
+        run: |
+          git clone https://github.com/acidanthera/OpenCorePkg.git OpenCore_Mod
+          cd ./OpenCore_Mod
+          
+          src=$(/usr/bin/curl -Lfs https://raw.githubusercontent.com/acidanthera/ocbuild/master/ci-bootstrap.sh) && eval "$src" || exit 1
+
+          # jq parses json, # token https://docs.github.com/en/developers/apps/building-oauth-apps/authorizing-oauth-apps  
+          latesttag=$(curl -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" -sL https://api.github.com/repos/${GITHUB_REPOSITORY}/releases/latest | jq -r .tag_name)
+
+          currenttag=$(grep OPEN_CORE_VERSION Include/Acidanthera/Library/OcMainLib.h | sed 's/.*"\(.*\)".*/\1/' | grep -E '^[0-9.]+$')_$(git rev-parse --short HEAD)
+          
+          echo latesttag: $latesttag
+          echo currenttag: $currenttag
+
+          if [ "${latesttag}" == "${currenttag}" ]; then
+            echo "isNew=false" >> $GITHUB_ENV
+          else
+            if git apply --check $GITHUB_WORKSPACE/mod.patch; then
+              git apply $GITHUB_WORKSPACE/mod.patch
+              curhead=$(git rev-parse --short HEAD)
+              curdate=$(date +"%Y-%m-%d")
+              curuser=304403268
+              sed -i'.bak' "s/OpenCore-Mod-XXXXXXXX-XXXX-XX-XX-XXXXXXXXXX/OpenCore-Mod-${curhead}-${curdate}-${curuser}/" ./Library/OcMainLib/OpenCoreMisc.c
+              echo "isNew=true" >> $GITHUB_ENV
+              echo "currenttag=${currenttag}" >> $GITHUB_ENV
+              echo "gitrevhead=$(git rev-parse HEAD)" >> $GITHUB_ENV
+            else
+              echo "error"
+              echo "isNew=false" >> $GITHUB_ENV
+            fi
+          fi
+
+      - name: build Duet
+        if: env.isNew == 'true'
+        run: cd OpenCore_Mod && ./build_duet.tool
+
+      - name: build OC
+        if: env.isNew == 'true'
+        run: cd OpenCore_Mod && ./build_oc.tool
+
+      - name: Upload to Artifacts
+        if: env.isNew == 'true'
+        uses: actions/upload-artifact@v3
+        with:
+          name: macOS XCODE5 Artifacts
+          path: OpenCore_Mod/Binaries/*.zip
+
+      - name: Upload to Release
+        if: env.isNew == 'true'
+        uses: softprops/action-gh-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ env.currenttag }}
+          body: |
+            Changes:  
+            [View on OpenCorePkg](https://github.com/acidanthera/OpenCorePkg/commits/master)  
+          files: OpenCore_Mod/Binaries/*.zip

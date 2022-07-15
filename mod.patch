@@ -1,0 +1,203 @@
+diff --git a/Application/OpenCore/OpenCore.c b/Application/OpenCore/OpenCore.c
+index 9f61ec5b..92faf4b3 100644
+--- a/Application/OpenCore/OpenCore.c
++++ b/Application/OpenCore/OpenCore.c
+@@ -90,7 +90,22 @@ OcStartImage (
+ {
+   EFI_STATUS                       Status;
+   EFI_CONSOLE_CONTROL_SCREEN_MODE  OldMode;
+-
++  CHAR16                           *DevicePathText;
++
++  if (Chosen->DevicePath != NULL) {
++    DevicePathText = ConvertDevicePathToText (Chosen->DevicePath, FALSE, FALSE);
++      if ((Chosen->Type & OC_BOOT_APPLE_ANY) != 0 || StrStr(DevicePathText, L"\\System\\Library\\CoreServices\\boot.efi") != NULL) {
++      if (!mOpenCoreConfiguration.Acpi.Quirks.EnableForAll) {
++        DEBUG ((DEBUG_INFO, "OC: OcLoadAcpiSupport for macOS...\n"));
++        OcLoadAcpiSupport (&mOpenCoreStorage, &mOpenCoreConfiguration);
++      }
++      DEBUG ((DEBUG_INFO, "OC: OcLoadPlatformSupport...\n"));
++      OcLoadPlatformSupport (&mOpenCoreConfiguration, &mOpenCoreCpuInfo);
++      DEBUG ((DEBUG_INFO, "OC: OcLoadDevPropsSupport...\n"));
++      OcLoadDevPropsSupport (&mOpenCoreConfiguration);
++    }
++    FreePool (DevicePathText);
++  }
+   OldMode = OcConsoleControlSetMode (
+               LaunchInText ? EfiConsoleControlScreenText : EfiConsoleControlScreenGraphics
+               );
+@@ -150,12 +165,14 @@ OcMain (
+   DEBUG ((DEBUG_INFO, "OC: OcMiscLoadSystemReport...\n"));
+   OcMiscLoadSystemReport (&mOpenCoreConfiguration, mStorageHandle);
+   DEBUG_CODE_END ();
+-  DEBUG ((DEBUG_INFO, "OC: OcLoadAcpiSupport...\n"));
+-  OcLoadAcpiSupport (&mOpenCoreStorage, &mOpenCoreConfiguration);
+-  DEBUG ((DEBUG_INFO, "OC: OcLoadPlatformSupport...\n"));
+-  OcLoadPlatformSupport (&mOpenCoreConfiguration, &mOpenCoreCpuInfo);
+-  DEBUG ((DEBUG_INFO, "OC: OcLoadDevPropsSupport...\n"));
+-  OcLoadDevPropsSupport (&mOpenCoreConfiguration);
++  if (mOpenCoreConfiguration.Acpi.Quirks.EnableForAll) {
++    DEBUG ((DEBUG_INFO, "OC: OcLoadAcpiSupport...\n"));
++    OcLoadAcpiSupport (&mOpenCoreStorage, &mOpenCoreConfiguration);
++  }
++  //DEBUG ((DEBUG_INFO, "OC: OcLoadPlatformSupport...\n"));
++  //OcLoadPlatformSupport (&mOpenCoreConfiguration, &mOpenCoreCpuInfo);
++  //DEBUG ((DEBUG_INFO, "OC: OcLoadDevPropsSupport...\n"));
++  //OcLoadDevPropsSupport (&mOpenCoreConfiguration);
+   DEBUG ((DEBUG_INFO, "OC: OcMiscLateInit...\n"));
+   OcMiscLateInit (Storage, &mOpenCoreConfiguration);
+   DEBUG ((DEBUG_INFO, "OC: OcLoadKernelSupport...\n"));
+diff --git a/Docs/Sample.plist b/Docs/Sample.plist
+index f3949a91..1936bf83 100644
+--- a/Docs/Sample.plist
++++ b/Docs/Sample.plist
+@@ -239,6 +239,8 @@
+ 		</array>
+ 		<key>Quirks</key>
+ 		<dict>
++			<key>EnableForAll</key>
++			<false/>
+ 			<key>FadtEnableReset</key>
+ 			<false/>
+ 			<key>NormalizeHeaders</key>
+@@ -315,6 +317,8 @@
+ 			<false/>
+ 			<key>DiscardHibernateMap</key>
+ 			<false/>
++			<key>EnableForAll</key>
++			<false/>
+ 			<key>EnableSafeModeSlide</key>
+ 			<true/>
+ 			<key>EnableWriteUnprotector</key>
+diff --git a/Docs/SampleCustom.plist b/Docs/SampleCustom.plist
+index 92299dfe..bac681be 100644
+--- a/Docs/SampleCustom.plist
++++ b/Docs/SampleCustom.plist
+@@ -239,6 +239,8 @@
+ 		</array>
+ 		<key>Quirks</key>
+ 		<dict>
++			<key>EnableForAll</key>
++			<false/>
+ 			<key>FadtEnableReset</key>
+ 			<false/>
+ 			<key>NormalizeHeaders</key>
+@@ -315,6 +317,8 @@
+ 			<false/>
+ 			<key>DiscardHibernateMap</key>
+ 			<false/>
++			<key>EnableForAll</key>
++			<false/>
+ 			<key>EnableSafeModeSlide</key>
+ 			<true/>
+ 			<key>EnableWriteUnprotector</key>
+diff --git a/Include/Acidanthera/Library/OcBootManagementLib.h b/Include/Acidanthera/Library/OcBootManagementLib.h
+index c50bb136..7f530956 100644
+--- a/Include/Acidanthera/Library/OcBootManagementLib.h
++++ b/Include/Acidanthera/Library/OcBootManagementLib.h
+@@ -899,6 +899,10 @@ struct OC_PICKER_CONTEXT_ {
+   //
+   OC_PRIVILEGE_CONTEXT        *PrivilegeContext;
+   //
++  // Additional suffix to build info.
++  //
++  CONST CHAR8                 *buildSuffix;
++  //
+   // Additional suffix to include by the interface.
+   //
+   CONST CHAR8                 *TitleSuffix;
+diff --git a/Include/Acidanthera/Library/OcConfigurationLib.h b/Include/Acidanthera/Library/OcConfigurationLib.h
+index 752e3ef5..920297dd 100644
+--- a/Include/Acidanthera/Library/OcConfigurationLib.h
++++ b/Include/Acidanthera/Library/OcConfigurationLib.h
+@@ -80,6 +80,7 @@ OC_DECLARE (OC_ACPI_PATCH_ARRAY)
+ /// ACPI quirks.
+ ///
+ #define OC_ACPI_QUIRKS_FIELDS(_, __) \
++  _(BOOLEAN                     , EnableForAll     ,     , FALSE  , ()) \
+   _(BOOLEAN                     , FadtEnableReset     ,     , FALSE  , ()) \
+   _(BOOLEAN                     , NormalizeHeaders    ,     , FALSE  , ()) \
+   _(BOOLEAN                     , RebaseRegions       ,     , FALSE  , ()) \
+@@ -140,6 +141,7 @@ OC_DECLARE (OC_BOOTER_PATCH_ARRAY)
+   _(BOOLEAN                     , DisableSingleUser         ,     , FALSE  , ()) \
+   _(BOOLEAN                     , DisableVariableWrite      ,     , FALSE  , ()) \
+   _(BOOLEAN                     , DiscardHibernateMap       ,     , FALSE  , ()) \
++  _(BOOLEAN                     , EnableForAll              ,     , FALSE  , ()) \
+   _(BOOLEAN                     , EnableSafeModeSlide       ,     , FALSE  , ()) \
+   _(BOOLEAN                     , EnableWriteUnprotector    ,     , FALSE  , ()) \
+   _(BOOLEAN                     , ForceBooterSignature      ,     , FALSE  , ()) \
+diff --git a/Library/OcConfigurationLib/OcConfigurationLib.c b/Library/OcConfigurationLib/OcConfigurationLib.c
+index a6203013..f6228c4d 100644
+--- a/Library/OcConfigurationLib/OcConfigurationLib.c
++++ b/Library/OcConfigurationLib/OcConfigurationLib.c
+@@ -145,6 +145,7 @@ OC_SCHEMA
+ STATIC
+ OC_SCHEMA
+   mAcpiQuirksSchema[] = {
++  OC_SCHEMA_BOOLEAN_IN ("EnableForAll",     OC_GLOBAL_CONFIG, Acpi.Quirks.EnableForAll),
+   OC_SCHEMA_BOOLEAN_IN ("FadtEnableReset",  OC_GLOBAL_CONFIG, Acpi.Quirks.FadtEnableReset),
+   OC_SCHEMA_BOOLEAN_IN ("NormalizeHeaders", OC_GLOBAL_CONFIG, Acpi.Quirks.NormalizeHeaders),
+   OC_SCHEMA_BOOLEAN_IN ("RebaseRegions",    OC_GLOBAL_CONFIG, Acpi.Quirks.RebaseRegions),
+@@ -187,6 +188,7 @@ OC_SCHEMA
+   OC_SCHEMA_BOOLEAN_IN ("DisableSingleUser",      OC_GLOBAL_CONFIG, Booter.Quirks.DisableSingleUser),
+   OC_SCHEMA_BOOLEAN_IN ("DisableVariableWrite",   OC_GLOBAL_CONFIG, Booter.Quirks.DisableVariableWrite),
+   OC_SCHEMA_BOOLEAN_IN ("DiscardHibernateMap",    OC_GLOBAL_CONFIG, Booter.Quirks.DiscardHibernateMap),
++  OC_SCHEMA_BOOLEAN_IN ("EnableForAll",           OC_GLOBAL_CONFIG, Booter.Quirks.EnableForAll),
+   OC_SCHEMA_BOOLEAN_IN ("EnableSafeModeSlide",    OC_GLOBAL_CONFIG, Booter.Quirks.EnableSafeModeSlide),
+   OC_SCHEMA_BOOLEAN_IN ("EnableWriteUnprotector", OC_GLOBAL_CONFIG, Booter.Quirks.EnableWriteUnprotector),
+   OC_SCHEMA_BOOLEAN_IN ("ForceBooterSignature",   OC_GLOBAL_CONFIG, Booter.Quirks.ForceBooterSignature),
+diff --git a/Library/OcMainLib/OpenCoreMisc.c b/Library/OcMainLib/OpenCoreMisc.c
+index 96d59675..8e26e532 100644
+--- a/Library/OcMainLib/OpenCoreMisc.c
++++ b/Library/OcMainLib/OpenCoreMisc.c
+@@ -331,7 +331,7 @@ SavePanicLog (
+     DEBUG ((DEBUG_INFO, "OC: Panic log does not exist\n"));
+   }
+ }
+-
++STATIC CHAR8 buildString[] = {"OpenCore-Mod-XXXXXXXX-XXXX-XX-XX-XXXXXXXXXX"};
+ CONST CHAR8 *
+ OcMiscGetVersionString (
+   VOID
+@@ -360,6 +360,7 @@ OcMiscGetVersionString (
+     /* [12]:[8]   = */ "YYYY-"
+     /* [15]:[13]  = */ "MM-"
+     /* [17]:[16]  = */ "DD"
++    " | MOD"
+   };
+ 
+   STATIC BOOLEAN  mOpenCoreVersionReady;
+@@ -919,6 +920,7 @@ OcMiscBoot (
+   Context->PickerVariant        = AsciiPickerVariant;
+   Context->BlacklistAppleUpdate = Config->Misc.Security.BlacklistAppleUpdate;
+ 
++  Context->buildSuffix          = buildString;
+   if ((Config->Misc.Security.ExposeSensitiveData & OCS_EXPOSE_VERSION_UI) != 0) {
+     Context->TitleSuffix = OcMiscGetVersionString ();
+   }
+diff --git a/Platform/OpenCanopy/Views/BootPicker.c b/Platform/OpenCanopy/Views/BootPicker.c
+index 7661647d..a5469c61 100644
+--- a/Platform/OpenCanopy/Views/BootPicker.c
++++ b/Platform/OpenCanopy/Views/BootPicker.c
+@@ -1948,7 +1948,7 @@ BootPickerViewInitialize (
+   }
+ 
+   mBootPicker.Hdr.Obj.NumChildren = NumBootEntries;
+-
++  if (GuiContext->PickerContext->buildSuffix != NULL) {FreePool(AsciiStrCopyToUnicode(GuiContext->PickerContext->buildSuffix, AsciiStrLen(GuiContext->PickerContext->buildSuffix)));}
+   if (GuiContext->PickerContext->TitleSuffix == NULL) {
+     mVersionLabelImage.Buffer = NULL;
+ 
+diff --git a/build_oc.tool b/build_oc.tool
+index 6767d44b..95b5537b 100755
+--- a/build_oc.tool
++++ b/build_oc.tool
+@@ -270,7 +270,7 @@ package() {
+   cp "${selfdir}/Utilities/ocvalidate/README.md" "${dstdir}/Utilities/ocvalidate"/ || exit 1
+ 
+   pushd "${dstdir}" || exit 1
+-  zip -qr -FS ../"OpenCore-${ver}-${2}.zip" ./* || exit 1
++  zip -qr -FS ../"OpenCore-Mod-${ver}-${2}.zip" ./* || exit 1
+   popd || exit 1
+   rm -rf "${dstdir}" || exit 1
+ 
