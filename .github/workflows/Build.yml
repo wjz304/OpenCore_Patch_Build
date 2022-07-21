@@ -47,31 +47,37 @@ jobs:
 
       - name: CI Bootstrap
         run: |
-          git clone https://github.com/acidanthera/OpenCorePkg.git OpenCore_Mod
+          git clone --depth=100 https://github.com/acidanthera/OpenCorePkg.git OpenCore_Mod
           cd ./OpenCore_Mod
           
           src=$(/usr/bin/curl -Lfs https://raw.githubusercontent.com/acidanthera/ocbuild/master/ci-bootstrap.sh) && eval "$src" || exit 1
 
           # jq parses json, # token https://docs.github.com/en/developers/apps/building-oauth-apps/authorizing-oauth-apps  
           latesttag=$(curl -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" -sL https://api.github.com/repos/${GITHUB_REPOSITORY}/releases/latest | jq -r .tag_name)
-
+          latestgit=${latesttag#*_}
           currenttag=$(grep OPEN_CORE_VERSION Include/Acidanthera/Library/OcMainLib.h | sed 's/.*"\(.*\)".*/\1/' | grep -E '^[0-9.]+$')_$(git rev-parse --short HEAD)
+          currentgit=${currenttag#*_}
           
           echo latesttag: $latesttag
+          echo latestgit: $latestgit
           echo currenttag: $currenttag
+          echo currentgit: $currentgit
 
           if [ "${latesttag}" == "${currenttag}" ]; then
-            echo "isNew=false" >> $GITHUB_ENV
+              echo "isNew=false" >> $GITHUB_ENV
           else
-            if git apply --check $GITHUB_WORKSPACE/mod.patch; then
-              git apply $GITHUB_WORKSPACE/mod.patch
-              curhead=$(git rev-parse --short HEAD)
-              curdate=$(date +"%Y-%m-%d")
-              curuser=304403268
-              sed -i'.bak' "s/OpenCore-Mod-XXXXXXXX-XXXX-XX-XX-XXXXXXXXXX/OpenCore-Mod-${curhead}-${curdate}-${curuser}/" ./Library/OcMainLib/OpenCoreMisc.c
-              echo "isNew=true" >> $GITHUB_ENV
-              echo "currenttag=${currenttag}" >> $GITHUB_ENV
-              echo "gitrevhead=$(git rev-parse HEAD)" >> $GITHUB_ENV
+              if git apply --check $GITHUB_WORKSPACE/mod.patch; then
+                git apply $GITHUB_WORKSPACE/mod.patch
+                curhead=${currentgit}
+                curdate=$(date +"%Y-%m-%d")
+                curuser=304403268
+                sed -i'.bak' "s/OpenCore-Mod-XXXXXXXX-XXXX-XX-XX-XXXXXXXXXX/OpenCore-Mod-${curhead}-${curdate}-${curuser}/" ./Library/OcMainLib/OpenCoreMisc.c
+                echo "isNew=true" >> $GITHUB_ENV
+                echo "currenttag=${currenttag}" >> $GITHUB_ENV
+                echo "gitrevhead=${currentgit}" >> $GITHUB_ENV
+                echo 'gitupgrade<<EOF' >> $GITHUB_ENV
+                git log ${latestgit}..${currentgit} --oneline >> $GITHUB_ENV
+                echo 'EOF' >> $GITHUB_ENV
             else
               echo "error"
               echo "isNew=false" >> $GITHUB_ENV
@@ -110,5 +116,6 @@ jobs:
           tag_name: ${{ env.currenttag }}
           body: |
             Changes:  
+            ${{ env.gitupgrade }}  
             [View on OpenCorePkg](https://github.com/acidanthera/OpenCorePkg/commits/master)  
           files: OpenCore_Mod/Binaries/*.zip
