@@ -1,6 +1,6 @@
 # OpenCore_Patch_Build
 
-## ½éÉÜ  
+## ä»‹ç»  
 [OpenCore_Patch_Build](https://github.com/wjz304/OpenCore_Patch_Build)
 
 <!-- downloads -->
@@ -16,9 +16,10 @@
 <img src="https://img.shields.io/badge/platform-macOS-lightgrey.svg?style=flat" alt="platform"/>
 </a>
 
-## Note
-±¾ÏîÄ¿½ö×Ô¶¯Patch OpenCore±àÒë¡£  
+## Note  
+æœ¬é¡¹ç›®ä»…è‡ªåŠ¨Patch OpenCoreç¼–è¯‘ã€‚  
 
-#Credits
-[btwise¡¯s OpenCore_NO_ACPI](https://gitee.com/btwise/OpenCore_NO_ACPI)
+#Credits  
+[OpenCorePkg](https://github.com/acidanthera/OpenCorePkg)  
+[OpenCore_NO_ACPI](https://gitee.com/btwise/OpenCore_NO_ACPI)  
 
