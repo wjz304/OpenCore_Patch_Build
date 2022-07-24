@@ -17,9 +17,9 @@
 </a>
 
 ## Note  
-本项目仅自动Patch OpenCore编译。  
+本项目为 OpenCore_Mod, 通过 Patch 方式 对 OpenCore 代码进行编译, 以做到实时编译更新。  
 
-#Credits  
+## Credits  
 [OpenCorePkg](https://github.com/acidanthera/OpenCorePkg)  
 [OpenCore_NO_ACPI](https://gitee.com/btwise/OpenCore_NO_ACPI)  
 
