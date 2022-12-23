@@ -1,8 +1,8 @@
 diff --git a/Application/OpenCore/OpenCore.c b/Application/OpenCore/OpenCore.c
-index 9f61ec5b..92faf4b3 100644
+index aec4f739..8d58cfa2 100644
 --- a/Application/OpenCore/OpenCore.c
 +++ b/Application/OpenCore/OpenCore.c
-@@ -90,7 +90,22 @@ OcStartImage (
+@@ -91,7 +91,22 @@ OcStartImage (
  {
    EFI_STATUS                       Status;
    EFI_CONSOLE_CONTROL_SCREEN_MODE  OldMode;
@@ -26,7 +26,7 @@ index 9f61ec5b..92faf4b3 100644
    OldMode = OcConsoleControlSetMode (
                LaunchInText ? EfiConsoleControlScreenText : EfiConsoleControlScreenGraphics
                );
-@@ -150,12 +165,14 @@ OcMain (
+@@ -151,12 +166,14 @@ OcMain (
    DEBUG ((DEBUG_INFO, "OC: OcMiscLoadSystemReport...\n"));
    OcMiscLoadSystemReport (&mOpenCoreConfiguration, mStorageHandle);
    DEBUG_CODE_END ();
@@ -48,7 +48,7 @@ index 9f61ec5b..92faf4b3 100644
    OcMiscLateInit (Storage, &mOpenCoreConfiguration);
    DEBUG ((DEBUG_INFO, "OC: OcLoadKernelSupport...\n"));
 diff --git a/Docs/Sample.plist b/Docs/Sample.plist
-index f3949a91..1936bf83 100644
+index 54bfbcdf..46369d6a 100644
 --- a/Docs/Sample.plist
 +++ b/Docs/Sample.plist
 @@ -239,6 +239,8 @@
@@ -69,8 +69,17 @@ index f3949a91..1936bf83 100644
  			<key>EnableSafeModeSlide</key>
  			<true/>
  			<key>EnableWriteUnprotector</key>
+@@ -1080,6 +1084,8 @@
+ 			<false/>
+ 			<key>ShowPicker</key>
+ 			<true/>
++			<key>SkipCustomEntryCheck</key>
++			<true/>
+ 			<key>TakeoffDelay</key>
+ 			<integer>0</integer>
+ 			<key>Timeout</key>
 diff --git a/Docs/SampleCustom.plist b/Docs/SampleCustom.plist
-index 92299dfe..bac681be 100644
+index 76c07907..0a6300b9 100644
 --- a/Docs/SampleCustom.plist
 +++ b/Docs/SampleCustom.plist
 @@ -239,6 +239,8 @@
@@ -91,11 +100,20 @@ index 92299dfe..bac681be 100644
  			<key>EnableSafeModeSlide</key>
  			<true/>
  			<key>EnableWriteUnprotector</key>
+@@ -1080,6 +1084,8 @@
+ 			<false/>
+ 			<key>ShowPicker</key>
+ 			<true/>
++			<key>SkipCustomEntryCheck</key>
++			<true/>
+ 			<key>TakeoffDelay</key>
+ 			<integer>0</integer>
+ 			<key>Timeout</key>
 diff --git a/Include/Acidanthera/Library/OcBootManagementLib.h b/Include/Acidanthera/Library/OcBootManagementLib.h
-index c50bb136..7f530956 100644
+index 8d7b57a9..b10c28e6 100644
 --- a/Include/Acidanthera/Library/OcBootManagementLib.h
 +++ b/Include/Acidanthera/Library/OcBootManagementLib.h
-@@ -899,6 +899,10 @@ struct OC_PICKER_CONTEXT_ {
+@@ -910,6 +910,10 @@ struct OC_PICKER_CONTEXT_ {
    //
    OC_PRIVILEGE_CONTEXT        *PrivilegeContext;
    //
@@ -107,7 +125,7 @@ index c50bb136..7f530956 100644
    //
    CONST CHAR8                 *TitleSuffix;
 diff --git a/Include/Acidanthera/Library/OcConfigurationLib.h b/Include/Acidanthera/Library/OcConfigurationLib.h
-index 752e3ef5..920297dd 100644
+index ec0d0fa3..b64c8b13 100644
 --- a/Include/Acidanthera/Library/OcConfigurationLib.h
 +++ b/Include/Acidanthera/Library/OcConfigurationLib.h
 @@ -80,6 +80,7 @@ OC_DECLARE (OC_ACPI_PATCH_ARRAY)
@@ -126,8 +144,65 @@ index 752e3ef5..920297dd 100644
    _(BOOLEAN                     , EnableSafeModeSlide       ,     , FALSE  , ()) \
    _(BOOLEAN                     , EnableWriteUnprotector    ,     , FALSE  , ()) \
    _(BOOLEAN                     , ForceBooterSignature      ,     , FALSE  , ()) \
+@@ -345,6 +347,7 @@ OC_DECLARE (OC_MISC_BLESS_ARRAY)
+   _(BOOLEAN                     , HibernateSkipsPicker        ,     , FALSE                               , ())                   \
+   _(BOOLEAN                     , HideAuxiliary               ,     , FALSE                               , ())                   \
+   _(BOOLEAN                     , PollAppleHotKeys            ,     , FALSE                               , ())                   \
++  _(BOOLEAN                     , SkipCustomEntryCheck        ,     , FALSE                               , ())                   \
+   _(BOOLEAN                     , ShowPicker                  ,     , FALSE                               , ())
+ OC_DECLARE (OC_MISC_BOOT)
+ 
+diff --git a/Library/OcBootManagementLib/BuiltinPicker.c b/Library/OcBootManagementLib/BuiltinPicker.c
+index 1efd27ea..b86395bf 100644
+--- a/Library/OcBootManagementLib/BuiltinPicker.c
++++ b/Library/OcBootManagementLib/BuiltinPicker.c
+@@ -760,12 +760,17 @@ OcShowSimpleBootMenu (
+         gST->ConOut->OutputString (gST->ConOut, L"\r\n");
+         OcPlayAudioFile (BootContext->PickerContext, OC_VOICE_OVER_AUDIO_FILE_RELOADING, OC_VOICE_OVER_AUDIO_BASE_TYPE_OPEN_CORE, FALSE);
+         return EFI_ABORTED;
+-      } else if ((PickerKeyInfo.OcKeyCode == OC_INPUT_MORE) && BootContext->PickerContext->HideAuxiliary) {
+-        gST->ConOut->OutputString (gST->ConOut, OC_MENU_SHOW_AUXILIARY);
+-        gST->ConOut->OutputString (gST->ConOut, L"\r\n");
+-        OcPlayAudioFile (BootContext->PickerContext, OC_VOICE_OVER_AUDIO_FILE_SHOW_AUXILIARY, OC_VOICE_OVER_AUDIO_BASE_TYPE_OPEN_CORE, FALSE);
+-        BootContext->PickerContext->HideAuxiliary = FALSE;
++      } else if (PickerKeyInfo.OcKeyCode == OC_INPUT_MORE) {
++        BootContext->PickerContext->HideAuxiliary = !BootContext->PickerContext->HideAuxiliary;
+         return EFI_ABORTED;
++        if (!BootContext->PickerContext->HideAuxiliary)
++        {
++          gST->ConOut->OutputString (gST->ConOut, OC_MENU_SHOW_AUXILIARY);
++          gST->ConOut->OutputString (gST->ConOut, L"\r\n");
++          OcPlayAudioFile (BootContext->PickerContext, OC_VOICE_OVER_AUDIO_FILE_SHOW_AUXILIARY, OC_VOICE_OVER_AUDIO_BASE_TYPE_OPEN_CORE, FALSE);
++          BootContext->PickerContext->HideAuxiliary = FALSE;
++          return EFI_ABORTED;
++		}
+       } else if (PickerKeyInfo.OcKeyCode == OC_INPUT_UP) {
+         if (ChosenEntry < 0) {
+           ChosenEntry = 0;
+diff --git a/Library/OcBootManagementLib/HotKeySupport.c b/Library/OcBootManagementLib/HotKeySupport.c
+index b2432134..8b7a5dfe 100644
+--- a/Library/OcBootManagementLib/HotKeySupport.c
++++ b/Library/OcBootManagementLib/HotKeySupport.c
+@@ -378,7 +378,7 @@ GetPickerKeyInfo (
+     //
+     // CMD+V is always valid and enables Verbose Mode.
+     //
+-    if (HasCommand && HasKeyV) {
++    if ((HasCommand && HasKeyV) || HasKeyV) {
+       if (OcGetArgumentFromCmd (Context->AppleBootArgs, "-v", L_STR_LEN ("-v"), NULL) == NULL) {
+         DEBUG ((DEBUG_INFO, "OCHK: CMD+V means -v\n"));
+         OcAppendArgumentToCmd (Context, Context->AppleBootArgs, "-v", L_STR_LEN ("-v"));
+@@ -390,7 +390,7 @@ GetPickerKeyInfo (
+     //
+     // CMD+C+MINUS is always valid and disables compatibility check.
+     //
+-    if (HasCommand && HasKeyC && HasKeyMinus) {
++    if ((HasCommand && HasKeyC && HasKeyMinus) || HasKeyC) {
+       if (OcGetArgumentFromCmd (Context->AppleBootArgs, "-no_compat_check", L_STR_LEN ("-no_compat_check"), NULL) == NULL) {
+         DEBUG ((DEBUG_INFO, "OCHK: CMD+C+MINUS means -no_compat_check\n"));
+         OcAppendArgumentToCmd (Context, Context->AppleBootArgs, "-no_compat_check", L_STR_LEN ("-no_compat_check"));
 diff --git a/Library/OcConfigurationLib/OcConfigurationLib.c b/Library/OcConfigurationLib/OcConfigurationLib.c
-index a6203013..f6228c4d 100644
+index a1a5d0ab..fb687f87 100644
 --- a/Library/OcConfigurationLib/OcConfigurationLib.c
 +++ b/Library/OcConfigurationLib/OcConfigurationLib.c
 @@ -145,6 +145,7 @@ OC_SCHEMA
@@ -146,8 +221,16 @@ index a6203013..f6228c4d 100644
    OC_SCHEMA_BOOLEAN_IN ("EnableSafeModeSlide",    OC_GLOBAL_CONFIG, Booter.Quirks.EnableSafeModeSlide),
    OC_SCHEMA_BOOLEAN_IN ("EnableWriteUnprotector", OC_GLOBAL_CONFIG, Booter.Quirks.EnableWriteUnprotector),
    OC_SCHEMA_BOOLEAN_IN ("ForceBooterSignature",   OC_GLOBAL_CONFIG, Booter.Quirks.ForceBooterSignature),
+@@ -417,6 +419,7 @@ OC_SCHEMA
+   OC_SCHEMA_STRING_IN ("PickerVariant",         OC_GLOBAL_CONFIG, Misc.Boot.PickerVariant),
+   OC_SCHEMA_BOOLEAN_IN ("PollAppleHotKeys",     OC_GLOBAL_CONFIG, Misc.Boot.PollAppleHotKeys),
+   OC_SCHEMA_BOOLEAN_IN ("ShowPicker",           OC_GLOBAL_CONFIG, Misc.Boot.ShowPicker),
++  OC_SCHEMA_BOOLEAN_IN ("SkipCustomEntryCheck", OC_GLOBAL_CONFIG, Misc.Boot.SkipCustomEntryCheck),
+   OC_SCHEMA_INTEGER_IN ("TakeoffDelay",         OC_GLOBAL_CONFIG, Misc.Boot.TakeoffDelay),
+   OC_SCHEMA_INTEGER_IN ("Timeout",              OC_GLOBAL_CONFIG, Misc.Boot.Timeout),
+ };
 diff --git a/Library/OcMainLib/OpenCoreMisc.c b/Library/OcMainLib/OpenCoreMisc.c
-index 96d59675..8e26e532 100644
+index 26c2c14c..8f8a74b5 100644
 --- a/Library/OcMainLib/OpenCoreMisc.c
 +++ b/Library/OcMainLib/OpenCoreMisc.c
 @@ -331,7 +331,7 @@ SavePanicLog (
@@ -167,7 +250,7 @@ index 96d59675..8e26e532 100644
    };
  
    STATIC BOOLEAN  mOpenCoreVersionReady;
-@@ -919,6 +920,7 @@ OcMiscBoot (
+@@ -921,6 +922,7 @@ OcMiscBoot (
    Context->PickerVariant        = AsciiPickerVariant;
    Context->BlacklistAppleUpdate = Config->Misc.Security.BlacklistAppleUpdate;
  
@@ -176,7 +259,7 @@ index 96d59675..8e26e532 100644
      Context->TitleSuffix = OcMiscGetVersionString ();
    }
 diff --git a/Platform/OpenCanopy/Views/BootPicker.c b/Platform/OpenCanopy/Views/BootPicker.c
-index 7661647d..a5469c61 100644
+index 88b507da..bd1b1dee 100644
 --- a/Platform/OpenCanopy/Views/BootPicker.c
 +++ b/Platform/OpenCanopy/Views/BootPicker.c
 @@ -1948,7 +1948,7 @@ BootPickerViewInitialize (
@@ -189,10 +272,10 @@ index 7661647d..a5469c61 100644
      mVersionLabelImage.Buffer = NULL;
  
 diff --git a/build_oc.tool b/build_oc.tool
-index 6767d44b..95b5537b 100755
+index 343fcbd1..0a44fced 100755
 --- a/build_oc.tool
 +++ b/build_oc.tool
-@@ -270,7 +270,7 @@ package() {
+@@ -286,7 +286,7 @@ package() {
    cp "${selfdir}/Utilities/ocvalidate/README.md" "${dstdir}/Utilities/ocvalidate"/ || exit 1
  
    pushd "${dstdir}" || exit 1
