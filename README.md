@@ -17,7 +17,8 @@
 </a>
 
 ## Note  
-本项目为 OpenCore_Mod, 通过 Patch 方式 对 OpenCore 代码进行编译, 以做到实时编译更新。  
+本项目为 OpenCore_Mod, 通过 Patch 方式 对 OpenCore 代码进行编译, 以做到实时编译更新. 
+该项目仅是一个实验性的项目，它可能并不稳定. 
 
 ## Credits  
 [OpenCorePkg](https://github.com/acidanthera/OpenCorePkg)  
