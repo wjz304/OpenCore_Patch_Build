@@ -48,7 +48,7 @@ index aec4f739..8d58cfa2 100644
    OcMiscLateInit (Storage, &mOpenCoreConfiguration);
    DEBUG ((DEBUG_INFO, "OC: OcLoadKernelSupport...\n"));
 diff --git a/Docs/Sample.plist b/Docs/Sample.plist
-index 54bfbcdf..46369d6a 100644
+index 683c4afd..b1c95720 100644
 --- a/Docs/Sample.plist
 +++ b/Docs/Sample.plist
 @@ -239,6 +239,8 @@
@@ -79,7 +79,7 @@ index 54bfbcdf..46369d6a 100644
  			<integer>0</integer>
  			<key>Timeout</key>
 diff --git a/Docs/SampleCustom.plist b/Docs/SampleCustom.plist
-index 76c07907..0a6300b9 100644
+index 2f3bdcab..c2e00e74 100644
 --- a/Docs/SampleCustom.plist
 +++ b/Docs/SampleCustom.plist
 @@ -239,6 +239,8 @@
@@ -110,10 +110,10 @@ index 76c07907..0a6300b9 100644
  			<integer>0</integer>
  			<key>Timeout</key>
 diff --git a/Include/Acidanthera/Library/OcBootManagementLib.h b/Include/Acidanthera/Library/OcBootManagementLib.h
-index 8d7b57a9..b10c28e6 100644
+index f2e4bfdc..c6584121 100644
 --- a/Include/Acidanthera/Library/OcBootManagementLib.h
 +++ b/Include/Acidanthera/Library/OcBootManagementLib.h
-@@ -910,6 +910,10 @@ struct OC_PICKER_CONTEXT_ {
+@@ -913,6 +913,10 @@ struct OC_PICKER_CONTEXT_ {
    //
    OC_PRIVILEGE_CONTEXT        *PrivilegeContext;
    //
@@ -125,7 +125,7 @@ index 8d7b57a9..b10c28e6 100644
    //
    CONST CHAR8                 *TitleSuffix;
 diff --git a/Include/Acidanthera/Library/OcConfigurationLib.h b/Include/Acidanthera/Library/OcConfigurationLib.h
-index ec0d0fa3..b64c8b13 100644
+index f3e30c66..bcd02b9b 100644
 --- a/Include/Acidanthera/Library/OcConfigurationLib.h
 +++ b/Include/Acidanthera/Library/OcConfigurationLib.h
 @@ -80,6 +80,7 @@ OC_DECLARE (OC_ACPI_PATCH_ARRAY)
@@ -180,19 +180,10 @@ index 1efd27ea..b86395bf 100644
          if (ChosenEntry < 0) {
            ChosenEntry = 0;
 diff --git a/Library/OcBootManagementLib/HotKeySupport.c b/Library/OcBootManagementLib/HotKeySupport.c
-index b2432134..8b7a5dfe 100644
+index 4c74383e..fdddb911 100644
 --- a/Library/OcBootManagementLib/HotKeySupport.c
 +++ b/Library/OcBootManagementLib/HotKeySupport.c
-@@ -378,7 +378,7 @@ GetPickerKeyInfo (
-     //
-     // CMD+V is always valid and enables Verbose Mode.
-     //
--    if (HasCommand && HasKeyV) {
-+    if ((HasCommand && HasKeyV) || HasKeyV) {
-       if (OcGetArgumentFromCmd (Context->AppleBootArgs, "-v", L_STR_LEN ("-v"), NULL) == NULL) {
-         DEBUG ((DEBUG_INFO, "OCHK: CMD+V means -v\n"));
-         OcAppendArgumentToCmd (Context, Context->AppleBootArgs, "-v", L_STR_LEN ("-v"));
-@@ -390,7 +390,7 @@ GetPickerKeyInfo (
+@@ -396,7 +396,7 @@ GetPickerKeyInfo (
      //
      // CMD+C+MINUS is always valid and disables compatibility check.
      //
@@ -202,7 +193,7 @@ index b2432134..8b7a5dfe 100644
          DEBUG ((DEBUG_INFO, "OCHK: CMD+C+MINUS means -no_compat_check\n"));
          OcAppendArgumentToCmd (Context, Context->AppleBootArgs, "-no_compat_check", L_STR_LEN ("-no_compat_check"));
 diff --git a/Library/OcConfigurationLib/OcConfigurationLib.c b/Library/OcConfigurationLib/OcConfigurationLib.c
-index a1a5d0ab..fb687f87 100644
+index 200d56f4..389675d4 100644
 --- a/Library/OcConfigurationLib/OcConfigurationLib.c
 +++ b/Library/OcConfigurationLib/OcConfigurationLib.c
 @@ -145,6 +145,7 @@ OC_SCHEMA
@@ -272,10 +263,10 @@ index 88b507da..bd1b1dee 100644
      mVersionLabelImage.Buffer = NULL;
  
 diff --git a/build_oc.tool b/build_oc.tool
-index 343fcbd1..0a44fced 100755
+index 9385e490..b6857bc2 100755
 --- a/build_oc.tool
 +++ b/build_oc.tool
-@@ -286,7 +286,7 @@ package() {
+@@ -303,7 +303,7 @@ package() {
    cp "${selfdir}/Utilities/ocvalidate/README.md" "${dstdir}/Utilities/ocvalidate"/ || exit 1
  
    pushd "${dstdir}" || exit 1
