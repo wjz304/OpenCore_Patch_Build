@@ -1,17 +1,16 @@
 #
 # Copyright (C) 2022 Ing <https://github.com/wjz304>
-# 
+#
 # This is free software, licensed under the MIT License.
 # See /LICENSE for more information.
 #
-
 
 name: Build OpenCore-Mod
 
 on:
   push:
   schedule:
-    - cron: '20 */6 * * *'
+    - cron: "20 */6 * * *"
   workflow_dispatch:
 
 env:
@@ -29,13 +28,13 @@ jobs:
       JOB_TYPE: BUILD
     steps:
       - uses: actions/checkout@main
-      
+
       - name: Initialization environment
-        run : |
+        run: |
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git config --global user.name "github-actions[bot]"
           sudo systemsetup -settimezone "Asia/Shanghai"
-          
+
       - name: Add Linux Toolchain
         run: brew tap FiloSottile/homebrew-musl-cross
 
@@ -55,7 +54,7 @@ jobs:
         run: |
           git clone https://github.com/acidanthera/OpenCorePkg.git OpenCore_Mod
           cd ./OpenCore_Mod
-          
+
           src=$(/usr/bin/curl -Lfs https://raw.githubusercontent.com/acidanthera/ocbuild/master/ci-bootstrap.sh) && eval "$src" || exit 1
 
           # jq parses json, # token https://docs.github.com/en/developers/apps/building-oauth-apps/authorizing-oauth-apps  
@@ -63,7 +62,7 @@ jobs:
           latestgit=${latesttag#*_}
           currenttag=$(grep OPEN_CORE_VERSION Include/Acidanthera/Library/OcMainLib.h | sed 's/.*"\(.*\)".*/\1/' | grep -E '^[0-9.]+$')_$(git rev-parse --short HEAD)
           currentgit=${currenttag#*_}
-          
+
           echo latesttag: $latesttag
           echo latestgit: $latestgit
           echo currenttag: $currenttag
@@ -124,5 +123,5 @@ jobs:
           body: |
             Changes:  
             ${{ env.gitupgrade }}  
-            [View on OpenCorePkg](https://github.com/acidanthera/OpenCorePkg/commits/master)  
+            [View on OpenCorePkg](https://github.com/acidanthera/OpenCorePkg/commits/master)
           files: OpenCore_Mod/Binaries/*.zip
