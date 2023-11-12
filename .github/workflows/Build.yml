@@ -69,24 +69,26 @@ jobs:
           echo currentgit: $currentgit
 
           if [ "${latesttag}" == "${currenttag}" ]; then
-              echo "isNew=false" >> $GITHUB_ENV
+            echo "isNew=false" >> $GITHUB_ENV
           else
-              if git apply --check $GITHUB_WORKSPACE/mod.patch; then
-                git apply $GITHUB_WORKSPACE/mod.patch
-                curhead=${currentgit}
-                curdate=$(date +"%Y-%m-%d")
-                curuser=304403268
-                sed -i'.bak' "s/OpenCore-Mod-XXXXXXXX-XXXX-XX-XX-XXXXXXXXXX/OpenCore-Mod-${curhead}-${curdate}-${curuser}/" ./Library/OcMainLib/OpenCoreMisc.c
-                echo "isNew=true" >> $GITHUB_ENV
-                echo "currenttag=${currenttag}" >> $GITHUB_ENV
-                echo "gitrevhead=${currentgit}" >> $GITHUB_ENV
-                [ "${latestgit}" == "null" ] && latestgit=.
-                echo 'gitupgrade<<EOF' >> $GITHUB_ENV
-                git log ${latestgit}..${currentgit} --oneline >> $GITHUB_ENV
-                echo 'EOF' >> $GITHUB_ENV
+            # git diff > mod.patch
+            if git apply --check $GITHUB_WORKSPACE/mod.patch; then
+              git apply $GITHUB_WORKSPACE/mod.patch
+              curhead=${currentgit}
+              curdate=$(date +"%Y-%m-%d")
+              curuser=304403268
+              sed -i'.bak' "s/OpenCore-Mod-XXXXXXXX-XXXX-XX-XX-XXXXXXXXXX/OpenCore-Mod-${curhead}-${curdate}-${curuser}/" ./Library/OcMainLib/OpenCoreMisc.c
+              echo "isNew=true" >> $GITHUB_ENV
+              echo "currenttag=${currenttag}" >> $GITHUB_ENV
+              echo "gitrevhead=${currentgit}" >> $GITHUB_ENV
+              [ "${latestgit}" == "null" ] && latestgit=.
+              echo 'gitupgrade<<EOF' >> $GITHUB_ENV
+              git log ${latestgit}..${currentgit} --oneline >> $GITHUB_ENV
+              echo 'EOF' >> $GITHUB_ENV
             else
-              echo "error"
               echo "isNew=false" >> $GITHUB_ENV
+              echo "patch error"
+              exit 1
             fi
           fi
 
