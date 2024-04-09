@@ -23,9 +23,11 @@ env:
 jobs:
   build-macos:
     name: macOS XCODE5
-    runs-on: macos-latest
+    runs-on: macos-14
     env:
       JOB_TYPE: BUILD
+      HOMEBREW_NO_INSTALL_CLEANUP: 1
+      HOMEBREW_NO_AUTO_UPDATE: 1
     steps:
       - name: Checkout
         uses: actions/checkout@main
